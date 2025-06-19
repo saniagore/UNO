@@ -16,70 +16,42 @@ public class Deck {
      * Constructs a new deck of Uno cards and initializes it.
      */
     public Deck() {
-        deckOfCards = new Stack<>();
+        this.deckOfCards = new Stack<>();
         initializeDeck();
-    }
-
-    /**
-     * Initializes the deck with cards based on the EISCUnoEnum values.
-     */
-    private void initializeDeck() {
-        for (EISCUnoEnum cardEnum : EISCUnoEnum.values()) {
-            if (cardEnum.name().startsWith("GREEN_") ||
-                    cardEnum.name().startsWith("YELLOW_") ||
-                    cardEnum.name().startsWith("BLUE_") ||
-                    cardEnum.name().startsWith("RED_") ||
-                    cardEnum.name().startsWith("SKIP_") ||
-                    cardEnum.name().startsWith("RESERVE_") ||
-                    cardEnum.name().startsWith("TWO_WILD_DRAW_") ||
-                    cardEnum.name().equals("FOUR_WILD_DRAW") ||
-                    cardEnum.name().equals("WILD")) {
-                Card card = new Card(cardEnum.getFilePath(), getCardValue(cardEnum.name()), getCardColor(cardEnum.name()));
-                deckOfCards.push(card);
-            }
-        }
         Collections.shuffle(deckOfCards);
     }
 
-    private String getCardValue(String name) {
-        if (name.endsWith("0")){
-            return "0";
-        } else if (name.endsWith("1")){
-            return "1";
-        } else if (name.endsWith("2")){
-            return "2";
-        } else if (name.endsWith("3")){
-            return "3";
-        } else if (name.endsWith("4")){
-            return "4";
-        } else if (name.endsWith("5")){
-            return "5";
-        } else if (name.endsWith("6")){
-            return "6";
-        } else if (name.endsWith("7")){
-            return "7";
-        } else if (name.endsWith("8")){
-            return "8";
-        } else if (name.endsWith("9")){
-            return "9";
-        } else {
-            return null;
+    /**
+     * Initializes the deck with cards using the CardFactory.
+     */
+    private void initializeDeck() {
+        CardFactory factory = new CardFactory();
+        for (EISCUnoEnum cardEnum : EISCUnoEnum.values()) {
+            // Avoid adding placeholder or background images to the deck
+            if (cardEnum.name().contains("CARD") || cardEnum.name().contains("BACKGROUND") || cardEnum.name().contains("BUTTON") || cardEnum.name().contains("FAVICON") || cardEnum.name().contains("UNO")) {
+                continue;
+            }
+            deckOfCards.push(factory.createCard(cardEnum));
+            // Numbered cards (1-9) and special cards appear twice per color
+            if (isDuplicatedCard(cardEnum.name())) {
+                deckOfCards.push(factory.createCard(cardEnum));
+            }
         }
-
     }
-
-    private String getCardColor(String name){
-        if(name.startsWith("GREEN")){
-            return "GREEN";
-        } else if(name.startsWith("YELLOW")){
-            return "YELLOW";
-        } else if(name.startsWith("BLUE")){
-            return "BLUE";
-        } else if(name.startsWith("RED")){
-            return "RED";
-        } else {
-            return null;
-        }
+    
+    /**
+     * Checks if a card type should be duplicated in the deck.
+     * @param name The name of the card from the enum.
+     * @return True if the card should be duplicated.
+     */
+    private boolean isDuplicatedCard(String name) {
+        return !name.contains("_0") && (name.startsWith("GREEN_") ||
+                name.startsWith("YELLOW_") ||
+                name.startsWith("BLUE_") ||
+                name.startsWith("RED_") ||
+                name.startsWith("SKIP_") ||
+                name.startsWith("RESERVE_") ||
+                name.startsWith("TWO_WILD_DRAW_"));
     }
 
     /**
@@ -90,6 +62,8 @@ public class Deck {
      */
     public Card takeCard() {
         if (deckOfCards.isEmpty()) {
+            // In a real game, the discard pile would be shuffled into a new deck.
+            // For this project, we throw an exception.
             throw new IllegalStateException("No hay más cartas en el mazo.");
         }
         return deckOfCards.pop();
@@ -102,5 +76,46 @@ public class Deck {
      */
     public boolean isEmpty() {
         return deckOfCards.isEmpty();
+    }
+
+    /**
+     * Inner class implementing the Factory pattern to create cards.
+     * This centralizes the logic for creating card objects from the enum.
+     */
+    private static class CardFactory {
+        public Card createCard(EISCUnoEnum cardEnum) {
+            String name = cardEnum.name();
+            String path = cardEnum.getFilePath();
+            String color = parseColor(name);
+            String value = parseValue(name);
+            String type = parseType(name);
+
+            return new Card(path, value, color, type);
+        }
+
+        private String parseColor(String name) {
+            if (name.contains("GREEN")) return "GREEN";
+            if (name.contains("YELLOW")) return "YELLOW";
+            if (name.contains("BLUE")) return "BLUE";
+            if (name.contains("RED")) return "RED";
+            return "WILD"; // For WILD and WILD_DRAW_FOUR
+        }
+
+        private String parseValue(String name) {
+            if (name.contains("SKIP")) return "SKIP";
+            if (name.contains("RESERVE")) return "REVERSE";
+            if (name.contains("TWO_WILD_DRAW")) return "+2";
+            if (name.contains("FOUR_WILD_DRAW")) return "+4";
+            if (name.contains("WILD")) return "WILD";
+            // For number cards, extract the number
+            return name.replaceAll("\\D+", ""); // Extracts digits
+        }
+
+        private String parseType(String name) {
+            if (name.matches(".*\\d.*")) { // If the name contains a digit
+                return "NUMBER";
+            }
+            return "SPECIAL";
+        }
     }
 }

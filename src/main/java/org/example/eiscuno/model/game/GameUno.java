@@ -1,5 +1,7 @@
 package org.example.eiscuno.model.game;
 
+import java.io.Serializable;
+
 import org.example.eiscuno.model.card.Card;
 import org.example.eiscuno.model.deck.Deck;
 import org.example.eiscuno.model.player.Player;
@@ -7,10 +9,12 @@ import org.example.eiscuno.model.table.Table;
 
 /**
  * Represents a game of Uno.
- * This class manages the game logic and interactions between players, deck, and the table.
+ * This class manages the game logic and interactions between players, deck, and
+ * the table.
  */
-public class GameUno implements IGameUno {
+public class GameUno implements IGameUno, Serializable {
 
+    private static final long serialVersionUID = 1L;
     private Player humanPlayer;
     private Player machinePlayer;
     private Deck deck;
@@ -37,13 +41,12 @@ public class GameUno implements IGameUno {
      */
     @Override
     public void startGame() {
-        for (int i = 0; i < 10; i++) {
-            if (i < 5) {
-                humanPlayer.addCard(this.deck.takeCard());
-            } else {
-                machinePlayer.addCard(this.deck.takeCard());
-            }
+        // Distribute 5 cards to each player
+        for (int i = 0; i < 5; i++) {
+            humanPlayer.addCard(this.deck.takeCard());
+            machinePlayer.addCard(this.deck.takeCard());
         }
+        // Ya no pone una carta en la mesa. El controlador lo hará.
     }
 
     /**
@@ -70,7 +73,8 @@ public class GameUno implements IGameUno {
     }
 
     /**
-     * Handles the scenario when a player shouts "Uno", forcing the other player to draw a card.
+     * Handles the scenario when a player shouts "Uno", forcing the other player to
+     * draw a card.
      *
      * @param playerWhoSang The player who shouted "Uno".
      */
@@ -84,7 +88,8 @@ public class GameUno implements IGameUno {
     }
 
     /**
-     * Retrieves the current visible cards of the human player starting from a specific position.
+     * Retrieves the current visible cards of the human player starting from a
+     * specific position.
      *
      * @param posInitCardToShow The initial position of the cards to show.
      * @return An array of cards visible to the human player.
@@ -105,10 +110,11 @@ public class GameUno implements IGameUno {
     /**
      * Checks if the game is over.
      *
-     * @return True if the deck is empty, indicating the game is over; otherwise, false.
+     * @return True if the deck is empty, indicating the game is over; otherwise,
+     *         false.
      */
     @Override
     public Boolean isGameOver() {
-        return null;
+        return humanPlayer.getCardsPlayer().isEmpty() || machinePlayer.getCardsPlayer().isEmpty();
     }
 }

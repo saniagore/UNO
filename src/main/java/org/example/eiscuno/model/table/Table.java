@@ -2,12 +2,14 @@ package org.example.eiscuno.model.table;
 
 import org.example.eiscuno.model.card.Card;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 /**
  * Represents the table in the Uno game where cards are played.
  */
-public class Table {
+public class Table implements Serializable{
+    private static final long serialVersionUID = 1L;
     private ArrayList<Card> cardsTable;
 
     /**
