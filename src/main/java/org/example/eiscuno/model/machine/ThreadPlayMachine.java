@@ -1,7 +1,6 @@
 package org.example.eiscuno.model.machine;
 
 import javafx.application.Platform;
-import javafx.scene.control.Alert;
 import javafx.scene.image.ImageView;
 import org.example.eiscuno.model.card.Card;
 import org.example.eiscuno.model.player.Player;
@@ -17,7 +16,8 @@ public class ThreadPlayMachine extends Thread {
     private volatile boolean isMyTurn = false;
     private GameUnoController controller;
 
-    public ThreadPlayMachine(Table table, Player machinePlayer, ImageView tableImageView, GameUnoController controller) {
+    public ThreadPlayMachine(Table table, Player machinePlayer, ImageView tableImageView,
+            GameUnoController controller) {
         this.table = table;
         this.machinePlayer = machinePlayer;
         this.tableImageView = tableImageView;
@@ -27,6 +27,9 @@ public class ThreadPlayMachine extends Thread {
     public void run() {
         while (true) {
             try {
+                if (controller.hasGameEnded()) {
+                    break;
+                }
                 // Non-busy waiting
                 synchronized (this) {
                     while (!isMyTurn) {
@@ -34,7 +37,8 @@ public class ThreadPlayMachine extends Thread {
                     }
                 }
 
-                if (controller.isGameOver()) break;
+                if (controller.isGameOver())
+                    break;
 
                 // "Thinking" time
                 Thread.sleep(2000);
@@ -69,7 +73,7 @@ public class ThreadPlayMachine extends Thread {
                 controller.handleCardEffect(cardToPlay, machinePlayer);
                 controller.updateMachineCardCount();
                 if (machinePlayer.getCardsPlayer().size() == 1) {
-                     System.out.println("Machine says UNO!");
+                    System.out.println("Machine says UNO!");
                 }
             });
         } else {
@@ -89,9 +93,10 @@ public class ThreadPlayMachine extends Thread {
             });
         }
     }
-    
+
     /**
      * Finds a valid card in the machine's hand to play.
+     * 
      * @return a playable Card, or null if none is found.
      */
     private Card findPlayableCard() {
@@ -103,9 +108,10 @@ public class ThreadPlayMachine extends Thread {
         }
         return null;
     }
-    
+
     /**
      * Sets the turn for the machine. Called by the controller.
+     * 
      * @param isMyTurn true to start the machine's turn, false otherwise.
      */
     public void setMyTurn(boolean isMyTurn) {

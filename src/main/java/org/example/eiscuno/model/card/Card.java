@@ -4,6 +4,11 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import java.io.Serializable;
 
+/**
+     * Re-initializes the transient JavaFX components (Image and ImageView) after deserialization.
+     * This method is crucial and must be called after a Card object is loaded from a file
+     * to make it visible again on the UI, as JavaFX nodes are not serializable.
+*/
 public class Card implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -20,7 +25,7 @@ public class Card implements Serializable {
         this.value = value;
         this.color = color;
         this.type = type;
-        reinitializeImageView(); // Llama al método para inicializar
+        reinitializeImageView();
     }
 
     private ImageView createCardImageView() {

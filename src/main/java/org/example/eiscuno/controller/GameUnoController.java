@@ -63,6 +63,7 @@ public class GameUnoController {
     private Thread humanUnoTimerThread;
     private volatile boolean isHumanTurn = true;
     private volatile boolean humanSaidUno = false;
+    private boolean gameHasEnded = false;
 
     /**
      * Custom exception for invalid plays.
@@ -73,28 +74,29 @@ public class GameUnoController {
         }
     }
 
+    /**
+     * Initializes the controller. It attempts to load a saved game from the default
+     * save file. If a saved game is not found or fails to load, it proceeds
+     * to start a new game session. It also initializes the background threads for
+     * the game logic.
+     */
     @FXML
     public void initialize() {
         File saveFile = new File(SAVE_FILE_NAME);
-
-        // Intenta cargar la partida si el archivo de guardado existe.
         if (saveFile.exists()) {
             System.out.println("Save file found. Attempting to load game...");
             try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(saveFile))) {
                 GameUno loadedGame = (GameUno) ois.readObject();
-                updateGameFromLoad(loadedGame); 
+                updateGameFromLoad(loadedGame);
                 System.out.println("Game loaded successfully!");
             } catch (IOException | ClassNotFoundException e) {
                 System.err.println("Could not load game, starting a new one. Error: " + e.getMessage());
-                startNewGame(); // Si falla la carga, inicia un juego nuevo
+                startNewGame();
             }
         } else {
-            // Si no hay archivo de guardado, inicia un juego nuevo.
             System.out.println("No save file found. Starting a new game...");
             startNewGame();
         }
-
-        // La lógica de los hilos y botones se mantiene igual
         threadPlayMachine = new ThreadPlayMachine(this.table, this.machinePlayer, this.tableImageView, this);
         threadPlayMachine.setDaemon(true);
         threadPlayMachine.start();
@@ -105,16 +107,9 @@ public class GameUnoController {
     }
 
     private void setupInitialCards() {
-        // 1. Poner la imagen de la carta inicial en la mesa. ¡ESTA ES LA CORRECCIÓN!
         tableImageView.setImage(table.getCurrentCardOnTheTable().getImage());
-
-        // 2. Mostrar las cartas del jugador humano
         printCardsHumanPlayer();
-
-        // 3. Actualizar el contador de cartas de la máquina
         updateMachineCardCount();
-
-        // 4. Dibujar el reverso de las cartas de la máquina
         gridPaneCardsMachine.getChildren().clear();
         Image backCardImage = new Image(
                 Objects.requireNonNull(getClass().getResource(EISCUnoEnum.CARD_UNO.getFilePath())).toString());
@@ -174,6 +169,8 @@ public class GameUnoController {
     }
 
     private void playHumanCard(Card card) throws InvalidPlayException {
+        if (gameHasEnded)
+            return;
         if (!validatePlay(card, table.getCurrentCardOnTheTable())) {
             throw new InvalidPlayException("This card doesn't match the color or value of the card on the table.");
         }
@@ -212,39 +209,36 @@ public class GameUnoController {
                 gameUno.eatCard(opponent, 2);
                 break;
             case "SKIP":
-                // El jugador actual vuelve a jugar, por lo que el turno no pasa a la máquina.
+
                 if (currentPlayer == humanPlayer) {
                     isHumanTurn = true;
                     showAlert("Turn Skipped!", "You get to play again.");
                 } else {
                     threadPlayMachine.setMyTurn(true);
                 }
-                turnPassedToMachine = true; // Técnicamente el turno se procesa de nuevo.
+                turnPassedToMachine = true;
                 break;
             case "+4":
                 gameUno.eatCard(opponent, 4);
-                // El jugador actual debe elegir un color.
+
                 if (currentPlayer == humanPlayer) {
                     showColorPickerDialog();
-                    turnPassedToMachine = true; // El turno se pasará dentro del diálogo.
+                    turnPassedToMachine = true;
                 }
                 break;
             case "WILD":
-                // El jugador actual debe elegir un color.
+
                 if (currentPlayer == humanPlayer) {
                     showColorPickerDialog();
-                    turnPassedToMachine = true; // El turno se pasará dentro del diálogo.
+                    turnPassedToMachine = true;
                 }
                 break;
         }
 
-        // Actualiza la UI para todos los jugadores
         printCardsHumanPlayer();
         updateMachineCardCount();
         checkUnoCondition();
 
-        // Pasa el turno a la máquina SOLO SI no fue un skip o una carta wild
-        // (esos casos se manejan de forma especial).
         if (currentPlayer == humanPlayer && !turnPassedToMachine) {
             threadPlayMachine.setMyTurn(true);
         }
@@ -308,6 +302,8 @@ public class GameUnoController {
 
     @FXML
     void onHandleTakeCard(ActionEvent event) {
+        if (gameHasEnded)
+            return;
         if (!isHumanTurn) {
             showAlert("Wait!", "It's not your turn.");
             return;
@@ -339,16 +335,27 @@ public class GameUnoController {
         if (humanUnoTimerThread != null && humanUnoTimerThread.isAlive()) {
             humanUnoTimerThread.interrupt(); // Stop the UNO timer if it's running
         }
-        // Aquí podrías cerrar la ventana o volver al menú principal.
-        // Por simplicidad, solo mostramos un mensaje.
         showAlert("Exit Game", "Thanks for playing! Exiting the game.");
         Platform.exit();
     }
 
     private void endGame(String winner) {
+        if (gameHasEnded) {
+            return;
+        }
+        gameHasEnded = true;
+        System.out.println("Game has ended. Winner: " + winner);
+
+        if (barajaCard != null)
+            barajaCard.setDisable(true);
+        if (buttonUno != null)
+            buttonUno.setDisable(true);
+        if (gridPaneCardsPlayer != null)
+            gridPaneCardsPlayer.setDisable(true);
+
         showAlert("Game Over", winner + " won the game!");
-        isHumanTurn = false; // Stop further plays
-        // Potentially disable all buttons
+        Platform.exit();
+        System.exit(0);
     }
 
     public boolean isGameOver() {
@@ -366,8 +373,6 @@ public class GameUnoController {
     }
 
     public void updateMachineCardCount() {
-        // Solo intenta actualizar el texto si la etiqueta fue inyectada correctamente
-        // desde el FXML
         if (machineCardCountLabel != null) {
             machineCardCountLabel.setText("Machine Cards: " + machinePlayer.getCardsPlayer().size());
         }
@@ -438,42 +443,40 @@ public class GameUnoController {
     private void startNewGame() {
         initVariables();
         gameUno.startGame();
-        
-        // Tomamos una carta para la mesa, asegurándonos de que el mazo no esté vacío
         if (!deck.isEmpty()) {
             table.addCardOnTheTable(deck.takeCard());
         }
-        
+
         setupInitialCards();
     }
 
     /**
      * Updates the entire game state and UI from a loaded GameUno object.
+     * 
      * @param loadedGame The game state loaded from a file.
      */
     private void updateGameFromLoad(GameUno loadedGame) {
-        // 1. Actualizamos las referencias del modelo en el controlador
+
         this.gameUno = loadedGame;
-        // Es crucial actualizar las referencias directas también
         this.humanPlayer = loadedGame.getHumanPlayer();
         this.machinePlayer = loadedGame.getMachinePlayer();
         this.deck = loadedGame.getDeck();
         this.table = loadedGame.getTable();
-        
-        // 2. Re-inicializamos todas las imágenes (que eran 'transient')
-        for (Card card : humanPlayer.getCardsPlayer()) card.reinitializeImageView();
-        for (Card card : machinePlayer.getCardsPlayer()) card.reinitializeImageView();
-        // El método getCardsTable() debe ser público en tu clase Table
-        for (Card card : table.getCardsTable()) card.reinitializeImageView();
 
-        // 3. Redibujamos toda la interfaz gráfica con el nuevo estado
-        setupInitialCards(); 
+        for (Card card : humanPlayer.getCardsPlayer())
+            card.reinitializeImageView();
+        for (Card card : machinePlayer.getCardsPlayer())
+            card.reinitializeImageView();
+        for (Card card : table.getCardsTable())
+            card.reinitializeImageView();
+        setupInitialCards();
         isHumanTurn = gameUno.getCurrentTurn().equals("HUMAN_PLAYER");
     }
 
     /**
      * Saves the current game state to a predefined file.
-     * This method is public to be called from the Stage when the application closes.
+     * This method is public to be called from the Stage when the application
+     * closes.
      */
     public void saveGameOnClose() {
         System.out.println("Saving game on close...");
@@ -485,5 +488,9 @@ public class GameUnoController {
             System.err.println("Could not save the game.");
             e.printStackTrace();
         }
+    }
+
+    public boolean hasGameEnded() {
+        return gameHasEnded;
     }
 }
