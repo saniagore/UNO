@@ -18,6 +18,9 @@ import org.example.eiscuno.model.table.Table;
 import org.example.eiscuno.model.unoenum.EISCUnoEnum;
 import javafx.scene.image.Image;
 
+import javafx.scene.control.ChoiceDialog;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
@@ -37,6 +40,8 @@ public class GameUnoController {
     private Button buttonUno;
     @FXML
     private Label machineCardCountLabel;
+    @FXML
+    private Button barajaCard;
 
     private Player humanPlayer;
     private Player machinePlayer;
@@ -106,6 +111,20 @@ public class GameUnoController {
             cardImageView.setFitWidth(70);
             gridPaneCardsMachine.add(cardImageView, i, 0);
         }
+
+        // 1. Obtenemos la ruta de la imagen como un String para usarla en CSS.
+        String backCardImagePath = Objects.requireNonNull(getClass().getResource(EISCUnoEnum.CARD_UNO.getFilePath()))
+                .toExternalForm();
+
+        // 2. Le damos al BOTÓN el tamaño deseado (no a una ImageView separada).
+        barajaCard.setPrefSize(70, 100);
+
+        // 3. Aplicamos el estilo CSS para usar la imagen como fondo.
+        barajaCard.setStyle(
+                "-fx-background-image: url('" + backCardImagePath + "'); " + // Establece la imagen de fondo.
+                        "-fx-background-size: cover; " + // Asegura que la imagen cubra todo el botón.
+                        "-fx-background-color: transparent;" // Hace transparente el color de fondo original del botón.
+        );
     }
 
     private void initVariables() {
@@ -173,33 +192,49 @@ public class GameUnoController {
     public void handleCardEffect(Card card, Player currentPlayer) {
         String cardValue = card.getValue();
         Player opponent = (currentPlayer == humanPlayer) ? machinePlayer : humanPlayer;
+        boolean turnPassedToMachine = false;
 
         switch (cardValue) {
             case "+2":
                 gameUno.eatCard(opponent, 2);
                 break;
-            case "+4":
-                gameUno.eatCard(opponent, 4);
-                // In a real game, the current player would choose a color
-                break;
             case "SKIP":
-                // The current player gets another turn
+                // El jugador actual vuelve a jugar, por lo que el turno no pasa a la máquina.
                 if (currentPlayer == humanPlayer) {
                     isHumanTurn = true;
+                    showAlert("Turn Skipped!", "You get to play again.");
                 } else {
-                    // Machine gets another turn immediately
                     threadPlayMachine.setMyTurn(true);
                 }
+                turnPassedToMachine = true; // Técnicamente el turno se procesa de nuevo.
                 break;
-            // Other special cards like REVERSE and WILD color change would be handled here.
+            case "+4":
+                gameUno.eatCard(opponent, 4);
+                // El jugador actual debe elegir un color.
+                if (currentPlayer == humanPlayer) {
+                    showColorPickerDialog();
+                    turnPassedToMachine = true; // El turno se pasará dentro del diálogo.
+                }
+                break;
+            case "WILD":
+                // El jugador actual debe elegir un color.
+                if (currentPlayer == humanPlayer) {
+                    showColorPickerDialog();
+                    turnPassedToMachine = true; // El turno se pasará dentro del diálogo.
+                }
+                break;
         }
 
-        // Update UI after effects
+        // Actualiza la UI para todos los jugadores
         printCardsHumanPlayer();
         updateMachineCardCount();
-
-        // Check for UNO condition
         checkUnoCondition();
+
+        // Pasa el turno a la máquina SOLO SI no fue un skip o una carta wild
+        // (esos casos se manejan de forma especial).
+        if (currentPlayer == humanPlayer && !turnPassedToMachine) {
+            threadPlayMachine.setMyTurn(true);
+        }
     }
 
     private void checkUnoCondition() {
@@ -243,8 +278,9 @@ public class GameUnoController {
     }
 
     public boolean validatePlay(Card cardToPlay, Card cardOnTable) {
+        String activeColor = table.getActiveColor(); // Usamos el color activo de la mesa
         return cardToPlay.getColor().equals("WILD") ||
-                cardToPlay.getColor().equals(cardOnTable.getColor()) ||
+                cardToPlay.getColor().equals(activeColor) ||
                 cardToPlay.getValue().equals(cardOnTable.getValue());
     }
 
@@ -343,6 +379,32 @@ public class GameUnoController {
         if (posInitCardToShow < humanPlayer.getCardsPlayer().size() - 4) {
             posInitCardToShow++;
             printCardsHumanPlayer();
+        }
+    }
+
+    private void showColorPickerDialog() {
+        List<String> colors = Arrays.asList("RED", "GREEN", "BLUE", "YELLOW");
+        ChoiceDialog<String> dialog = new ChoiceDialog<>("RED", colors);
+        dialog.setTitle("Color Picker");
+        dialog.setHeaderText("Choose a color");
+        dialog.setContentText("Select the next color:");
+
+        // Muestra el diálogo y espera a que el usuario elija.
+        Optional<String> result = dialog.showAndWait();
+
+        // Si el usuario eligió un color, actualiza la mesa.
+        result.ifPresent(color -> {
+            table.setActiveColor(color);
+            // Una vez elegido el color, es el turno de la máquina.
+            threadPlayMachine.setMyTurn(true);
+        });
+
+        // Si el usuario cierra el diálogo sin elegir, se podría asignar un color por
+        // defecto
+        // o volver a mostrar el diálogo. Por simplicidad, asumimos que siempre elige.
+        if (result.isEmpty()) {
+            table.setActiveColor("RED"); // Color por defecto si se cancela
+            threadPlayMachine.setMyTurn(true);
         }
     }
 }
