@@ -19,6 +19,13 @@ import org.example.eiscuno.model.unoenum.EISCUnoEnum;
 import javafx.scene.image.Image;
 
 import javafx.scene.control.ChoiceDialog;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +36,8 @@ import java.util.Random;
  * Controller class for the Uno game.
  */
 public class GameUnoController {
+
+    private static final String SAVE_FILE_NAME = "uno_save.dat";
 
     @FXML
     private GridPane gridPaneCardsMachine;
@@ -66,29 +75,33 @@ public class GameUnoController {
 
     @FXML
     public void initialize() {
-        initVariables();
-        gameUno.startGame(); // Reparte cartas a los jugadores. La mesa aún está vacía.
+        File saveFile = new File(SAVE_FILE_NAME);
 
-        // --- SOLUCIÓN DIRECTA Y ROBUSTA ---
-        // Tomamos la PRIMERA carta disponible del mazo y la ponemos en la mesa.
-        // No usamos bucles para evitar cualquier error lógico oculto.
-        // Esto garantiza que la mesa tendrá una carta antes de que la UI intente
-        // dibujarla.
-        if (!deck.isEmpty()) {
-            Card firstCard = deck.takeCard();
-            table.addCardOnTheTable(firstCard);
+        // Intenta cargar la partida si el archivo de guardado existe.
+        if (saveFile.exists()) {
+            System.out.println("Save file found. Attempting to load game...");
+            try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(saveFile))) {
+                GameUno loadedGame = (GameUno) ois.readObject();
+                updateGameFromLoad(loadedGame); 
+                System.out.println("Game loaded successfully!");
+            } catch (IOException | ClassNotFoundException e) {
+                System.err.println("Could not load game, starting a new one. Error: " + e.getMessage());
+                startNewGame(); // Si falla la carga, inicia un juego nuevo
+            }
+        } else {
+            // Si no hay archivo de guardado, inicia un juego nuevo.
+            System.out.println("No save file found. Starting a new game...");
+            startNewGame();
         }
-        // --- FIN DE LA SOLUCIÓN ---
 
-        // Ahora, con la certeza de que la mesa tiene una carta, actualizamos la vista.
-        setupInitialCards();
-
-        // El resto del código para iniciar los hilos no cambia.
+        // La lógica de los hilos y botones se mantiene igual
         threadPlayMachine = new ThreadPlayMachine(this.table, this.machinePlayer, this.tableImageView, this);
         threadPlayMachine.setDaemon(true);
         threadPlayMachine.start();
 
-        buttonUno.setVisible(false);
+        if (buttonUno != null) {
+            buttonUno.setVisible(false);
+        }
     }
 
     private void setupInitialCards() {
@@ -416,6 +429,61 @@ public class GameUnoController {
         if (result.isEmpty()) {
             table.setActiveColor("RED"); // Color por defecto si se cancela
             threadPlayMachine.setMyTurn(true);
+        }
+    }
+
+    /**
+     * Initializes the state for a brand new game.
+     */
+    private void startNewGame() {
+        initVariables();
+        gameUno.startGame();
+        
+        // Tomamos una carta para la mesa, asegurándonos de que el mazo no esté vacío
+        if (!deck.isEmpty()) {
+            table.addCardOnTheTable(deck.takeCard());
+        }
+        
+        setupInitialCards();
+    }
+
+    /**
+     * Updates the entire game state and UI from a loaded GameUno object.
+     * @param loadedGame The game state loaded from a file.
+     */
+    private void updateGameFromLoad(GameUno loadedGame) {
+        // 1. Actualizamos las referencias del modelo en el controlador
+        this.gameUno = loadedGame;
+        // Es crucial actualizar las referencias directas también
+        this.humanPlayer = loadedGame.getHumanPlayer();
+        this.machinePlayer = loadedGame.getMachinePlayer();
+        this.deck = loadedGame.getDeck();
+        this.table = loadedGame.getTable();
+        
+        // 2. Re-inicializamos todas las imágenes (que eran 'transient')
+        for (Card card : humanPlayer.getCardsPlayer()) card.reinitializeImageView();
+        for (Card card : machinePlayer.getCardsPlayer()) card.reinitializeImageView();
+        // El método getCardsTable() debe ser público en tu clase Table
+        for (Card card : table.getCardsTable()) card.reinitializeImageView();
+
+        // 3. Redibujamos toda la interfaz gráfica con el nuevo estado
+        setupInitialCards(); 
+        isHumanTurn = gameUno.getCurrentTurn().equals("HUMAN_PLAYER");
+    }
+
+    /**
+     * Saves the current game state to a predefined file.
+     * This method is public to be called from the Stage when the application closes.
+     */
+    public void saveGameOnClose() {
+        System.out.println("Saving game on close...");
+        File file = new File(SAVE_FILE_NAME);
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
+            oos.writeObject(this.gameUno);
+            System.out.println("Game saved successfully to " + file.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Could not save the game.");
+            e.printStackTrace();
         }
     }
 }

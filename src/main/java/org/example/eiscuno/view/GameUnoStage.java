@@ -1,5 +1,6 @@
 package org.example.eiscuno.view;
 
+import org.example.eiscuno.controller.GameUnoController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -27,6 +28,12 @@ public class GameUnoStage extends Stage {
             // Re-throwing the caught IOException
             throw new IOException("Error while loading FXML file", e);
         }
+
+        GameUnoController controller = loader.getController();
+        this.setOnCloseRequest(event -> {
+        controller.saveGameOnClose();
+        });
+        
         Scene scene = new Scene(root);
         // Configuring the stage
         setTitle("EISC Uno"); // Sets the title of the stage
