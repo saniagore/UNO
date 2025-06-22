@@ -321,6 +321,17 @@ public class GameUnoController {
         }
     }
 
+    @FXML
+    void onHandleExitGame(ActionEvent event) {
+        if (humanUnoTimerThread != null && humanUnoTimerThread.isAlive()) {
+            humanUnoTimerThread.interrupt(); // Stop the UNO timer if it's running
+        }
+        // Aquí podrías cerrar la ventana o volver al menú principal.
+        // Por simplicidad, solo mostramos un mensaje.
+        showAlert("Exit Game", "Thanks for playing! Exiting the game.");
+        Platform.exit();
+    }
+
     private void endGame(String winner) {
         showAlert("Game Over", winner + " won the game!");
         isHumanTurn = false; // Stop further plays

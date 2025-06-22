@@ -36,9 +36,10 @@
    <top>
       <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" spacing="10.0" BorderPane.alignment="CENTER">
          <children>
-            <Label prefHeight="27.0" prefWidth="78.0" text="EISC Uno" textFill="RED">
+            <Button fx:id="buttonSalir" onAction="#onHandleExitGame" mnemonicParsing="false" style="-fx-background-color: red;" text="Salir" textFill="WHITE" />
+            <Label prefHeight="22.0" prefWidth="63.0" text="EISC Uno" textFill="RED">
                <font>
-                  <Font name="Berlin Sans FB Bold" size="18.0" />
+                  <Font size="14.0" />
                </font>
             </Label>
             <GridPane fx:id="gridPaneCardsMachine">
@@ -52,7 +53,6 @@
                   <RowConstraints />
                </rowConstraints>
             </GridPane>
-            <Button mnemonicParsing="false" text="Salir" />
          </children>
       </HBox>
    </top>
